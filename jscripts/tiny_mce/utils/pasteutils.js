@@ -52,8 +52,7 @@
 		'strike_through' : '<$1strike>',
 		'bad_attrs_marker' : '$1',
 		'list_item_marker' : '$&__MCE_ITEM__',
-		'mso_list_marker' : '$1__MCE_ITEM__',
-		'mso_symbol_item_marker' : '$1__MCE_ITEM__'
+		'mso_list_marker' : '$1__MCE_ITEM__'
 	};
 
 	pasteutils.cleanHTML = function cleanHTML(text) {
@@ -65,53 +64,51 @@
 	};
 
 	pasteutils._preprocess = function _preprocess(container) {
-
-		var h = container.html(), len;
+		this.processed_html = container.html();
 
 		// Detect Word content and process it more aggressive
-		if (pasteutils.patterns.word_content.test(h)) {
-			h = this._process([
+		if (pasteutils.patterns.word_content.test(this.processed_html)) {
+			this._process([
 				pasteutils.patterns.beginning_nbsps,
 				pasteutils.patterns.ending_nbsps
-			], h);
+			]);
 
-			h = this._process([[pasteutils.patterns.scrub_A_char, '']], h);
+			this._process([[pasteutils.patterns.scrub_A_char, '']]);
 
-			h = this._process([
+			this._process([
 				[pasteutils.patterns.support_list_marker, pasteutils.strings.list_item_marker],
 				[pasteutils.patterns.mso_list_marker, pasteutils.strings.mso_list_marker],
-				[pasteutils.patterns.mso_list_symbol_marker, pasteutils.strings.mso_symbol_item_marker]
-			], h);
+				[pasteutils.patterns.mso_list_symbol_marker, pasteutils.strings.mso_list_marker]
+			]);
 
-			h = this._process([
+			this._process([
 				pasteutils.patterns.conditional_comments,
 				// Remove comments, scripts (e.g., msoShowComment), XML tag, VML content, MS Office namespaced tags, and a few other tags
 				pasteutils.patterns.other_comments,
 				[pasteutils.patterns.ms_strike, pasteutils.strings.strike_through],
 				[pasteutils.patterns.nbsp_marker, pasteutils.strings.nbsp]
-			], h);
+			]);
 
-			while (pasteutils.patterns.bad_attrs.test(h))
-			  h = this._process([pasteutils.patterns.bad_attrs, '$1'], h);
+			while (pasteutils.patterns.bad_attrs.test(this.processed_html))
+			  this._process([pasteutils.patterns.bad_attrs, '$1']);
 
-			h = h.replace(pasteutils.patterns.span_marker, "");
+			this.processed_html = this.processed_html.replace(pasteutils.patterns.span_marker, "");
 		}
 
-		h = this._process([
+		this._process([
 			// Copy paste from Java like Open Office will produce this junk on FF
 			[pasteutils.patterns.open_office_scrub, '']
-		], h);
+		]);
 
-		h = h.replace(pasteutils.patterns.span_marker, "");
+		this.processed_html = this.processed_html.replace(pasteutils.patterns.span_marker, "");
 
-		container.html(h);
+		container.html(this.processed_html);
 	};
 
-	pasteutils._process = function _process(items, h) {
+	pasteutils._process = function _process(items) {
 		items.forEach(function(v) {
-			h = h.replace(v[0], v[1] || '');
-		});
-		return h;
+			this.processed_html = this.processed_html.replace(v[0], v[1] || '');
+		}.bind(this));
 	};
 
 	pasteutils._postprocess = function _postprocess(container) {
