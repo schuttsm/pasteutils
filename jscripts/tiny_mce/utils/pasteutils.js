@@ -1,12 +1,12 @@
 /**
- * editable_selects.js
+ * pasteutils.js
  *
  * Copyright 2009, Moxiecode Systems AB
  * Released under LGPL License.
  *
  * License: http://tinymce.moxiecode.com/license
  * Contributing: http://tinymce.moxiecode.com/contributing
- * by Stephen Schutt & Peter Rust
+ * adapted by Stephen Schutt & Peter Rust
  * 
  * Pasteutils began as a fork of the paste plugin for TinyMCE - it converts list html pasted from MS Word into 
  * 		semantic html list elements more useable html.  Basically all this does is convert tags that look like <o:mso> 
@@ -19,69 +19,62 @@
 (function($) {
 	window.pasteutils = window.pasteutils || {};
 	pasteutils.patterns = {
-		'word_content': /class="?Mso|style="[^"]*\bmso-|w:WordDocument/i,
-		'scrub_A_char': new RegExp(String.fromCharCode(194), 'ig'),
-		'beginning_nbsps': /^\s*(&nbsp;)+/gi,
-		'ending_nbsps': /(&nbsp;|<br[^>]*>)+\s*$/gi,
-		'support_list_marker': '/<!--\[if !supportLists\]-->/gi',
-		'mso_list_marker':  '/(<span[^>]+(?:mso-list:|:\s*symbol)[^>]+>)/gi',
-		'mso_list_symbol_marker': /(<p[^>]+(?:MsoListParagraph)[^>]+>)/gi,
-		'conditional_comments': /<!--[\s\S]+?-->/gi,
-		'other_comments': /<(!|script[^>]*>.*?<\/script(?=[>\s])|\/?(\?xml(:\w+)?|img|meta|link|style|\w:\w+)(?=[\s\/>]))[^>]*>/gi,
-		'ms_strike': /<(\/?)s>/gi,
-		'nbsp_marker': /&nbsp;/gi,
-		'bad_attrs': /(<[a-z][^>]*\s)(?:id|name|language|on\w+|\w+:\w+)=(?:"[^"]*"|\w+)\s?/gi,
-		'span_marker' : /<\/?span[^>]*>/gi,
-		'open_office_scrub': /Version:[\d.]+\nStartHTML:\d+\nEndHTML:\d+\nStartFragment:\d+\nEndFragment:\d+/gi,
-		'ul_match' : /^(__MCE_ITEM__)+[\u2022\u00b7\u00a7\u00d8o\u25CF]\s*\u00a0*/,
-		'ol_match' : /^[__MCE_ITEM__]+\s*\w+(\.|\))\s*\u00a0+/,
-		'i_bullet_type' : /^[__MCE_ITEM__]+\s*[i]+(\.|\))\s*\u00a0+/,
-		'I_bullet_type' : /^[__MCE_ITEM__]+\s*[I]+(\.|\))\s*\u00a0+/,
-		'one_bullet_type' : /^[__MCE_ITEM__]+\s*\d+(\.|\))\s*\u00a0+/,
 		'a_bullet_type' : /^[__MCE_ITEM__]+\s*[a-z]+(\.|\))\s*\u00a0+/,
 		'A_bullet_type' : /^[__MCE_ITEM__]+\s*[A-Z]+(\.|\))\s*\u00a0+/,
+		'bad_attrs': /(<[a-z][^>]*\s)(?:id|name|language|on\w+|\w+:\w+)=(?:"[^"]*"|\w+)\s?/gi,
+		'beginning_nbsps': /^\s*(&nbsp;)+/gi,
+		'conditional_comments': /<!--[\s\S]+?-->/gi,
+		'ending_nbsps': /(&nbsp;|<br[^>]*>)+\s*$/gi,
+		'i_bullet_type' : /^[__MCE_ITEM__]+\s*[i]+(\.|\))\s*\u00a0+/,
+		'I_bullet_type' : /^[__MCE_ITEM__]+\s*[I]+(\.|\))\s*\u00a0+/,
 		'indent_match' : /level(\d?)/i,
+		'middot_match' : /^[\u2022\u00b7\u00a7\u00d8o\u25CF]\s*(&nbsp;|\u00a0)+\s*/,
+		'middot_other_match' : /^[\s|&nbsp;]*\w+[\.|\)](&nbsp;|\u00a0)+\s*/,
 		'middot_span_match' : /^__MCE_ITEM__[\u2022\u00b7\u00a7\u00d8o\u25CF]/,
 		'middot_span_other_match' : /^__MCE_ITEM__[\s\S]*\w+\.(&nbsp;|\u00a0)*\s*/,
-		'middot_match' : /^[\u2022\u00b7\u00a7\u00d8o\u25CF]\s*(&nbsp;|\u00a0)+\s*/,
-		'middot_other_match' : /^[\s|&nbsp;]*\w+[\.|\)](&nbsp;|\u00a0)+\s*/
+		'ms_strike': /<(\/?)s>/gi,
+		'mso_list_marker':  '/(<span[^>]+(?:mso-list:|:\s*symbol)[^>]+>)/gi',
+		'mso_list_symbol_marker': /(<p[^>]+(?:MsoListParagraph)[^>]+>)/gi,
+		'nbsp_marker': /&nbsp;/gi,
+		'ol_match' : /^[__MCE_ITEM__]+\s*\w+(\.|\))\s*\u00a0+/,
+		'one_bullet_type' : /^[__MCE_ITEM__]+\s*\d+(\.|\))\s*\u00a0+/,
+		'open_office_scrub': /Version:[\d.]+\nStartHTML:\d+\nEndHTML:\d+\nStartFragment:\d+\nEndFragment:\d+/gi,
+		'other_comments': /<(!|script[^>]*>.*?<\/script(?=[>\s])|\/?(\?xml(:\w+)?|img|meta|link|style|\w:\w+)(?=[\s\/>]))[^>]*>/gi,
+		'scrub_A_char': new RegExp(String.fromCharCode(194), 'ig'),
+		'span_marker' : /<\/?span[^>]*>/gi,
+		'support_list_marker': '/<!--\[if !supportLists\]-->/gi',
+		'ul_match' : /^(__MCE_ITEM__)+[\u2022\u00b7\u00a7\u00d8o\u25CF]\s*\u00a0*/,
+		'word_content': /class="?Mso|style="[^"]*\bmso-|w:WordDocument/i
 	};
 
 	pasteutils.strings = {
-		'nbsp' : '\u00a0',
-		'strike_through' : '<$1strike>',
 		'bad_attrs_marker' : '$1',
 		'list_item_marker' : '$&__MCE_ITEM__',
-		'mso_list_marker' : '$1__MCE_ITEM__'
+		'mso_list_marker' : '$1__MCE_ITEM__',
+		'nbsp' : '\u00a0',
+		'strike_through' : '<$1strike>'
 	};
 
 	pasteutils.cleanHTML = function cleanHTML(text) {
 		var container = $('<div>');
 		container.html(text);
-		this._preprocess(container);
-		this._postprocess(container);
+		pasteutils._preprocess(container);
+		pasteutils._postprocess(container);
 		return container.html();
 	};
 
 	pasteutils._preprocess = function _preprocess(container) {
-		this.processed_html = container.html();
+		pasteutils.processed_html = container.html();
 
 		// Detect Word content and process it more aggressive
-		if (pasteutils.patterns.word_content.test(this.processed_html)) {
-			this._process([
+		if (pasteutils.patterns.word_content.test(pasteutils.processed_html)) {
+			pasteutils._process([
 				pasteutils.patterns.beginning_nbsps,
-				pasteutils.patterns.ending_nbsps
-			]);
-
-			this._process([[pasteutils.patterns.scrub_A_char, '']]);
-
-			this._process([
+				pasteutils.patterns.ending_nbsps,
+				[pasteutils.patterns.scrub_A_char],
 				[pasteutils.patterns.support_list_marker, pasteutils.strings.list_item_marker],
 				[pasteutils.patterns.mso_list_marker, pasteutils.strings.mso_list_marker],
-				[pasteutils.patterns.mso_list_symbol_marker, pasteutils.strings.mso_list_marker]
-			]);
-
-			this._process([
+				[pasteutils.patterns.mso_list_symbol_marker, pasteutils.strings.mso_list_marker],
 				pasteutils.patterns.conditional_comments,
 				// Remove comments, scripts (e.g., msoShowComment), XML tag, VML content, MS Office namespaced tags, and a few other tags
 				pasteutils.patterns.other_comments,
@@ -89,25 +82,24 @@
 				[pasteutils.patterns.nbsp_marker, pasteutils.strings.nbsp]
 			]);
 
-			while (pasteutils.patterns.bad_attrs.test(this.processed_html))
-			  this._process([pasteutils.patterns.bad_attrs, '$1']);
+			while (pasteutils.patterns.bad_attrs.test(pasteutils.processed_html))
+			  pasteutils._process([pasteutils.patterns.bad_attrs, '$1']);
 
-			this.processed_html = this.processed_html.replace(pasteutils.patterns.span_marker, "");
+			pasteutils._process([[pasteutils.patterns.span_marker]]);
 		}
 
-		this._process([
+		pasteutils._process([
 			// Copy paste from Java like Open Office will produce this junk on FF
-			[pasteutils.patterns.open_office_scrub, '']
+			pasteutils.patterns.open_office_scrub,
+			pasteutils.patterns.span_marker
 		]);
 
-		this.processed_html = this.processed_html.replace(pasteutils.patterns.span_marker, "");
-
-		container.html(this.processed_html);
+		container.html(pasteutils.processed_html);
 	};
 
 	pasteutils._process = function _process(items) {
 		items.forEach(function(v) {
-			this.processed_html = this.processed_html.replace(v[0], v[1] || '');
+			pasteutils.processed_html = pasteutils.processed_html.replace(v[0], v[1] || '');
 		}.bind(this));
 	};
 
@@ -115,10 +107,10 @@
 		// Remove named anchors or TOC links
 		container.find('a').each(function(a) {
 			if (!a.href || a.href.indexOf('#_Toc') != -1)
-				this._remove(a, 1);
+				pasteutils._remove(a, 1);
 		});
 
-		this._convertLists(container);
+		pasteutils._convertLists(container);
 	};
 
 	pasteutils._convertLists = function _convertLists(container) {
@@ -126,7 +118,7 @@
 		var lastLevel = lastType = listElm = null;
 
 		// Convert middot lists into real semantic lists
-		container.find('p').each(this._parseParagraph.bind(this));
+		container.find('p').each(pasteutils._parseParagraph.bind(this));
 
 		// Remove any left over makers
 		html = container.html();
@@ -146,22 +138,22 @@
 
 		if (pasteutils.patterns.ol_match.test(val)) {
 			type = 'ol';
-			ol_type = this._getOlType(val);
+			ol_type = pasteutils._getOlType(val);
 		}
 
 		if (type) {
-			level = this._getLevel(p);
+			level = pasteutils._getLevel(p);
 
-			if (this._isNewList(listElm, lastType, type, level)) {
-				listElm = this._createNewList(type, ol_type);
+			if (pasteutils._isNewList(listElm, lastType, type, level)) {
+				listElm = pasteutils._createNewList(type, ol_type);
 				listElm.insertBefore(p);
 			}
-			else if (this._isDeeper(level, lastLevel)) {
-				var child_menu = this._createNewList(type, ol_type);
+			else if (pasteutils._isDeeper(level, lastLevel)) {
+				var child_menu = pasteutils._createNewList(type, ol_type);
 				listElm.find('li:last').append(child_menu);
 				listElm = child_menu;
 			}
-			else if (this._isShallower(level, lastLevel)) {
+			else if (pasteutils._isShallower(level, lastLevel)) {
 				var num_levels_to_pop = lastLevel - level;
 				_.range(num_levels_to_pop).forEach(function() {
 				  var closest_li = $(listElm).closest('li');
@@ -174,11 +166,11 @@
 
 			// Remove middot or number spans if they exists
 			container.find('span').each(function(span) {
-				this._removeMiddotSpan(span, type);
+				pasteutils._removeMiddotSpan(span, type);
 			});
 
 			html = $(p).html();
-			html = this._paragraphMiddotFilter(type, p);
+			html = pasteutils._paragraphMiddotFilter(type, p);
 			$(listElm).append($('<li>').html(html));
 			$(p).remove();
 
